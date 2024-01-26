@@ -9,24 +9,28 @@ struct Subscriber
 end
 
 # Render HTML from file
-function renderHTML(htmlFile::String, context::Dict = Dict(); status = 200, headers = ["Content-Type" => "text/html; charset=utf-8"]) :: HTTP.Response
-    isContextEmpty = isempty(context) === true
+function renderHTML(htmlFile::String, cssFile::String, context::Dict = Dict(); status = 200, headers = ["Content-Type" => "text/html; charset=utf-8"]) :: HTTP.Response
+    isContextEmpty = isempty(context)
 
-    # Return raw HTML without context
-    if isContextEmpty
-        io = open(htmlFile, "r") do file
-            read(file, String)
-        end
-        template = io |> String
-
-    # Return HTML with context
-    else
-        io = open(htmlFile, "r") do file
-            read(file, String)
-        end
-        template = String(Mustache.render(io, context))
+    # Read HTML file
+    io = open(htmlFile, "r") do file
+        read(file, String)
     end
-        return HTTP.Response(status, headers, body = template)
+    template = isContextEmpty ? io |> String : String(Mustache.render(io, context))
+
+    # Read CSS file
+    css = ""
+    if !isempty(cssFile)
+        css_io = open(cssFile, "r") do file
+            read(file, String)
+        end
+        css = "<style>$css_io</style>"
+    end
+
+    # Combine HTML and CSS
+    template = "<html><head>$css</head><body>$template</body></html>"
+
+    return HTTP.Response(status, headers, body = template)
 end
 
 # Creating Home Page Route
@@ -42,7 +46,7 @@ end
 # Render HTML with context
 @get "/" function(reg::HTTP.Request)
     context = Dict("name" => "Brandon")
-    return renderHTML("index.html", context)
+    return renderHTML("index.html", "style.css", context)
 end
 
 # Receiving query params
@@ -55,7 +59,7 @@ end
     formData = queryparams(req)
     name = get(formData, "name", 0)
     context = Dict("name" => name)
-    return renderHTML("form.html", context)
+    return renderHTML("form.html", "style.css", context)
 end
 
 # Path params
